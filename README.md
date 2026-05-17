@@ -1,2 +1,2 @@
-# thegladiator
-For the strongest
+# The Gladiator
+Multiplayer game.
