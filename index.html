@@ -218,6 +218,7 @@
     .dmg-critical { color: var(--gold); font-size: 34px; }
     .dmg-weak { color: #666; font-size: 18px; }
     .dmg-blocked { color: #64c8ff; font-size: 20px; }
+    .dmg-parry   { color: #f0abfc; font-size: 20px; }
     @keyframes floatUp {
       0%   { opacity: 1; transform: translateY(0); }
       100% { opacity: 0; transform: translateY(-70px); }
@@ -469,7 +470,7 @@ const ATTACK_RANGE      = 80;
 const K_FACTOR          = 60;
 const DASH_COOLDOWN_MS  = 3000;
 const DASH_DISTANCE     = 200;
-const PARRY_WINDOW_MS   = 500;   // ms after being hit to trigger parry
+const PARRY_WINDOW_MS   = 800;   // ms after being hit to trigger parry
 const SHIELD_RAISE_MS   = 150;   // delay before shield is active
 
 // ════════════════════════════════════════════════════════════════
@@ -492,9 +493,8 @@ let isShielding = false;
 let shieldRaising = false;
 let shieldRaiseTimeout = null;
 
-// Parry state — track when I last got hit (for parry window)
 let myLastHitTime = 0;
-// Track when opponent last got hit (for bot parry)
+let myLastAttackTime = 0; // track when player last swung
 let oppLastHitTime = 0;
 
 // ════════════════════════════════════════════════════════════════
@@ -947,6 +947,7 @@ function onAttack() {
   if (!canAttack || !currentMatch) return;
   // Can't attack while shielding
   if (isShielding || shieldRaising) return;
+  myLastAttackTime = Date.now(); // record swing for parry window
 
   const me  = players.get(clientId);
   const opp = players.get(currentMatch.opponentId);
@@ -1032,33 +1033,31 @@ function handleOpponentAttack(data) {
 
   const now = Date.now();
 
-  // Check if I parry: I was recently hit (within parry window) AND I'm not shielding AND I attacked (canAttack reset means I just attacked)
-  // Parry triggers if player is IN their attack animation (canAttack false = swinging)
-  const inParryWindow = (now - myLastHitTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising;
+  // Parry: triggered if you swung recently, regardless of whether you've been hit before
+  const inParryWindow = (now - myLastAttackTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising;
 
-  if (inParryWindow) {
-    // PARRY! 20% of damage back to opponent
-    const parryDmg = Math.max(1, Math.round(damage * 0.2));
+  // Always take the hit first
+  let finalDamage = damage;
+  if (isShielding) {
+    finalDamage = Math.max(1, Math.floor(damage * 0.5));
+    showDamageNum(finalDamage, 'blocked', me.element);
+  } else {
+    showDamageNum(finalDamage, hitType, me.element);
+    myLastHitTime = now;
+  }
+  myHealth = Math.max(0, myHealth - finalDamage);
+  updateHealth(me.element, myHealth);
+  if (myHealth <= 0) { endMatch(false, false); return; }
+
+  // Then, if in parry window, also deal 50% back to opponent
+  if (inParryWindow && !isShielding) {
+    const parryDmg = Math.max(1, Math.round(damage * 0.5));
     oppHealth = Math.max(0, oppHealth - parryDmg);
     const opp = players.get(currentMatch.opponentId);
-    if (opp) { updateHealth(opp.element, oppHealth); showDamageNum(parryDmg, 'normal', opp.element); }
+    if (opp) { updateHealth(opp.element, oppHealth); showDamageNum(parryDmg, 'parry', opp.element); }
     showParryEffect(me.element);
-    // Tell server/opponent about parry damage
     sendAction('parry_damage', { damage: parryDmg });
-    if (oppHealth <= 0) { endMatch(true, false); return; }
-  } else {
-    // Normal hit — apply shield reduction or full damage
-    let finalDamage = damage;
-    if (isShielding) {
-      finalDamage = Math.max(1, Math.floor(damage * 0.5));
-      showDamageNum(finalDamage, 'blocked', me.element);
-    } else {
-      showDamageNum(finalDamage, hitType, me.element);
-      myLastHitTime = now; // record hit time for parry window
-    }
-    myHealth = Math.max(0, myHealth - finalDamage);
-    updateHealth(me.element, myHealth);
-    if (myHealth <= 0) endMatch(false, false);
+    if (oppHealth <= 0) endMatch(true, false);
   }
 }
 
@@ -1066,23 +1065,14 @@ function handleOpponentAttack(data) {
 //  PARRY VISUALS
 // ════════════════════════════════════════════════════════════════
 function showParryEffect(targetEl) {
-  // Big PARRY text
-  const flash = document.createElement('div');
-  flash.className = 'parry-flash';
-  flash.textContent = 'PARRY!';
-  document.body.appendChild(flash);
-  setTimeout(() => flash.remove(), 900);
-
-  // Spark at player position
   const r = targetEl.getBoundingClientRect();
-  const spark = document.createElement('div');
-  spark.className = 'parry-spark';
-  spark.textContent = '✨';
-  spark.style.fontSize = '48px';
-  spark.style.left = (r.left + r.width / 2 - 24) + 'px';
-  spark.style.top  = (r.top  + r.height / 2 - 24) + 'px';
-  document.body.appendChild(spark);
-  setTimeout(() => spark.remove(), 500);
+  const label = document.createElement('div');
+  label.className = 'damage-number dmg-parry';
+  label.textContent = '⚡PARRY';
+  label.style.left = (r.left + r.width / 2) + 'px';
+  label.style.top  = r.top + 'px';
+  document.body.appendChild(label);
+  setTimeout(() => label.remove(), 900);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1232,13 +1222,26 @@ function botAttack(bot, player) {
   // We approximate: if myLastHitTime is within parry window and player is NOT shielding
   const playerInParryWindow = (now - myLastHitTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising;
 
-  if (playerInParryWindow && meterCharge > 5) {
-    // Player parries the bot attack
-    const parryDmg = Math.max(1, Math.round(damage * 0.2));
+ if (playerInParryWindow && meterCharge > 5) {
+    // Player parries — still takes full damage, but deals 50% back to bot
+    let finalDmg = damage;
+    if (isShielding) {
+      finalDmg = Math.max(1, Math.floor(damage * 0.5));
+      showDamageNum(finalDmg, 'blocked', player.element);
+    } else {
+      showDamageNum(finalDmg, hitType, player.element);
+      myLastHitTime = Date.now();
+    }
+    player.health = Math.max(0, player.health - finalDmg);
+    myHealth = player.health;
+    updateHealth(player.element, player.health);
+    if (myHealth <= 0 && currentMatch) { endMatch(false, false); return; }
+
+    const parryDmg = Math.max(1, Math.round(damage * 0.5));
     oppHealth = Math.max(0, oppHealth - parryDmg);
     bot.health = oppHealth;
     updateHealth(bot.element, oppHealth);
-    showDamageNum(parryDmg, 'normal', bot.element);
+    showDamageNum(parryDmg, 'parry', bot.element);
     showParryEffect(player.element);
     bot.canAttack = false; bot.charge = 0;
     setTimeout(() => { if (bot) bot.canAttack = true; }, 200);
