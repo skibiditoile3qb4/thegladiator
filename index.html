@@ -494,7 +494,8 @@ let shieldRaising = false;
 let shieldRaiseTimeout = null;
 
 let myLastHitTime = 0;
-let myLastAttackTime = 0; // track when player last swung
+let myLastAttackTime = 0;
+let myLastSwingPower = 0; // power of player's most recent swing
 let oppLastHitTime = 0;
 
 // ════════════════════════════════════════════════════════════════
@@ -947,7 +948,8 @@ function onAttack() {
   if (!canAttack || !currentMatch) return;
   // Can't attack while shielding
   if (isShielding || shieldRaising) return;
-  myLastAttackTime = Date.now(); // record swing for parry window
+  myLastAttackTime = Date.now();
+  myLastSwingPower = damage; // record swing power for clash
 
   const me  = players.get(clientId);
   const opp = players.get(currentMatch.opponentId);
@@ -974,7 +976,7 @@ function onAttack() {
 
       if (botInParryWindow) {
         // Bot parries! 20% of original damage dealt back to me
-        const parryDmg = Math.max(1, Math.round(damage * 0.2));
+        const parryDmg = Math.max(1, Math.round(damage * 0.5));
         myHealth = Math.max(0, myHealth - parryDmg);
         const myEl = players.get(clientId);
         updateHealth(myEl.element, myHealth);
@@ -1032,11 +1034,33 @@ function handleOpponentAttack(data) {
   if (!me || damage <= 0) return;
 
   const now = Date.now();
+  const inClashWindow = (now - myLastAttackTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising && myLastSwingPower > 0;
 
-  // Parry: triggered if you swung recently, regardless of whether you've been hit before
-  const inParryWindow = (now - myLastAttackTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising;
+  if (inClashWindow) {
+    const diff = myLastSwingPower - damage;
+    if (diff >= 0) {
+      // Player wins clash — opponent takes the difference, player takes nothing
+      const clashDmg = Math.max(1, diff);
+      oppHealth = Math.max(0, oppHealth - clashDmg);
+      const opp = players.get(currentMatch.opponentId);
+      if (opp) { updateHealth(opp.element, oppHealth); showDamageNum(clashDmg, 'parry', opp.element); }
+      showParryEffect(me.element);
+      sendAction('parry_damage', { damage: clashDmg });
+      if (oppHealth <= 0) endMatch(true, false);
+    } else {
+      // Opponent wins clash — player takes the difference only
+      const clashDmg = Math.max(1, Math.abs(diff));
+      showDamageNum(clashDmg, hitType, me.element);
+      myHealth = Math.max(0, myHealth - clashDmg);
+      updateHealth(me.element, myHealth);
+      showParryEffect(me.element);
+      if (myHealth <= 0) { endMatch(false, false); return; }
+    }
+    myLastSwingPower = 0; // consume the swing
+    return;
+  }
 
-  // Always take the hit first
+  // Normal hit — no clash
   let finalDamage = damage;
   if (isShielding) {
     finalDamage = Math.max(1, Math.floor(damage * 0.5));
@@ -1047,20 +1071,8 @@ function handleOpponentAttack(data) {
   }
   myHealth = Math.max(0, myHealth - finalDamage);
   updateHealth(me.element, myHealth);
-  if (myHealth <= 0) { endMatch(false, false); return; }
-
-  // Then, if in parry window, also deal 50% back to opponent
-  if (inParryWindow && !isShielding) {
-    const parryDmg = Math.max(1, Math.round(damage * 0.5));
-    oppHealth = Math.max(0, oppHealth - parryDmg);
-    const opp = players.get(currentMatch.opponentId);
-    if (opp) { updateHealth(opp.element, oppHealth); showDamageNum(parryDmg, 'parry', opp.element); }
-    showParryEffect(me.element);
-    sendAction('parry_damage', { damage: parryDmg });
-    if (oppHealth <= 0) endMatch(true, false);
-  }
+  if (myHealth <= 0) endMatch(false, false);
 }
-
 // ════════════════════════════════════════════════════════════════
 //  PARRY VISUALS
 // ════════════════════════════════════════════════════════════════
@@ -1222,30 +1234,32 @@ function botAttack(bot, player) {
   // We approximate: if myLastHitTime is within parry window and player is NOT shielding
   const playerInParryWindow = (now - myLastHitTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising;
 
- if (playerInParryWindow && meterCharge > 5) {
-    // Player parries — still takes full damage, but deals 50% back to bot
-    let finalDmg = damage;
-    if (isShielding) {
-      finalDmg = Math.max(1, Math.floor(damage * 0.5));
-      showDamageNum(finalDmg, 'blocked', player.element);
+const playerInClashWindow = (Date.now() - myLastAttackTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising && myLastSwingPower > 0;
+
+  if (playerInClashWindow) {
+    const diff = myLastSwingPower - damage;
+    myLastSwingPower = 0; // consume the swing
+    showParryEffect(player.element);
+    if (diff >= 0) {
+      // Player wins — bot takes the difference, player takes nothing
+      const clashDmg = Math.max(1, diff);
+      oppHealth = Math.max(0, oppHealth - clashDmg);
+      bot.health = oppHealth;
+      updateHealth(bot.element, oppHealth);
+      showDamageNum(clashDmg, 'parry', bot.element);
     } else {
-      showDamageNum(finalDmg, hitType, player.element);
+      // Bot wins — player takes the difference only
+      const clashDmg = Math.max(1, Math.abs(diff));
+      player.health = Math.max(0, player.health - clashDmg);
+      myHealth = player.health;
+      updateHealth(player.element, player.health);
+      showDamageNum(clashDmg, hitType, player.element);
       myLastHitTime = Date.now();
     }
-    player.health = Math.max(0, player.health - finalDmg);
-    myHealth = player.health;
-    updateHealth(player.element, player.health);
-    if (myHealth <= 0 && currentMatch) { endMatch(false, false); return; }
-
-    const parryDmg = Math.max(1, Math.round(damage * 0.5));
-    oppHealth = Math.max(0, oppHealth - parryDmg);
-    bot.health = oppHealth;
-    updateHealth(bot.element, oppHealth);
-    showDamageNum(parryDmg, 'parry', bot.element);
-    showParryEffect(player.element);
     bot.canAttack = false; bot.charge = 0;
     setTimeout(() => { if (bot) bot.canAttack = true; }, 200);
-    if (oppHealth <= 0 && currentMatch) endMatch(true, false);
+    if (oppHealth <= 0 && currentMatch) { endMatch(true, false); return; }
+    if (myHealth <= 0 && currentMatch) { endMatch(false, false); return; }
     return;
   }
 
