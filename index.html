@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gladiator Arena</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold: #ffd700;
+      --gold-dark: #b7791f;
+      --gold-btn: #d69e2e;
+      --red: #ef4444;
+      --green: #4ade80;
+      --purple: #8b5cf6;
+      --bg: #0a0a0a;
+      --panel: #1a1a1a;
+      --border: #333;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: #fff;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ── SCREENS ── */
+    .screen { display: none; width: 100vw; height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+    h1 {
+      font-size: 48px;
+      background: linear-gradient(135deg, #ff4500, var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 24px;
+    }
+
+    /* ── AUTH SCREEN ── */
+    #authScreen {
+      gap: 0;
+    }
+    .auth-box {
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .auth-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      background: #0a0a0a;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      color: #888;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .auth-tab.active {
+      background: var(--gold-btn);
+      border-color: var(--gold-dark);
+      color: #000;
+    }
+    .auth-input {
+      padding: 14px 16px;
+      background: #0a0a0a;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .auth-input:focus { border-color: var(--gold-btn); }
+    .auth-input::placeholder { color: #555; }
+    .auth-btn {
+      padding: 16px;
+      background: var(--gold-btn);
+      border: 2px solid var(--gold-dark);
+      border-radius: 8px;
+      color: #000;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .auth-btn:hover { background: var(--gold-dark); transform: scale(1.02); }
+    .auth-btn:disabled { background: #444; border-color: #333; color: #666; cursor: not-allowed; transform: none; }
+    .auth-message {
+      text-align: center;
+      font-size: 14px;
+      min-height: 20px;
+      color: var(--red);
+    }
+    .auth-message.success { color: var(--green); }
+
+    /* ── LOBBY SCREEN ── */
+    #lobbyScreen.active {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 20px;
+      gap: 30px;
+    }
+
+    .lobby-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      flex: 1;
+      max-width: 480px;
+    }
+
+    #eloDisplay {
+      text-align: center;
+    }
+    .elo-label { font-size: 14px; color: #888; margin-bottom: 4px; }
+    #eloValue { font-size: 40px; font-weight: bold; color: var(--gold); }
+    .elo-sub { font-size: 13px; color: #555; margin-top: 4px; }
+
+    .queue-panel {
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .match-type-selector { display: flex; gap: 12px; }
+    .match-type-btn {
+      padding: 12px 24px;
+      background: #333;
+      border: 2px solid #555;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .match-type-btn:hover { background: #444; }
+    .match-type-btn.active { background: var(--gold-btn); border-color: var(--gold-dark); color: #000; }
+
+    .difficulty-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+    .difficulty-btn {
+      padding: 14px;
+      background: #2a2a2a;
+      border: 2px solid #444;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .difficulty-btn:hover { background: #333; border-color: #666; }
+    .difficulty-btn.selected { background: var(--gold-btn); border-color: var(--gold-dark); }
+    .diff-name { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
+    .diff-desc { font-size: 11px; color: #888; }
+    .difficulty-btn.selected .diff-desc { color: #333; }
+
+    #findMatchBtn {
+      padding: 18px 56px;
+      background: var(--gold-btn);
+      border: 2px solid var(--gold-dark);
+      border-radius: 8px;
+      color: #000;
+      font-weight: bold;
+      font-size: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #findMatchBtn:hover { background: var(--gold-dark); transform: scale(1.05); }
+    #findMatchBtn:disabled { background: #444; border-color: #333; color: #666; cursor: not-allowed; transform: none; }
+    #queueMsg { font-size: 16px; color: #888; min-height: 24px; }
+    #queueCountWrap { font-size: 13px; color: #888; }
+    #queueCount { color: var(--gold); font-weight: bold; }
+
+    .logout-btn {
+      padding: 8px 20px;
+      background: transparent;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #888;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+    /* LEADERBOARD PANEL */
+    .lb-panel {
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      width: 360px;
+      margin-top: 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .lb-tabs { display: flex; gap: 8px; }
+    .lb-tab {
+      flex: 1;
+      padding: 8px;
+      background: #0a0a0a;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      color: #888;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .lb-tab:hover { background: #1a1a1a; }
+    .lb-tab.active { background: var(--gold-btn); border-color: var(--gold-dark); color: #000; }
+    #lbList { max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+    .lb-entry {
+      padding: 10px 14px;
+      background: #0a0a0a;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .lb-rank { color: var(--gold); font-weight: bold; margin-right: 10px; min-width: 28px; }
+    .lb-elo { color: var(--gold); font-weight: bold; }
+    .lb-you { color: #aaa; font-size: 11px; }
+
+    /* ── BATTLE SCREEN ── */
+    #battleScreen { overflow: hidden; }
+    #battleArena {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: radial-gradient(circle at center, #2a2a2a 0%, #1a1a1a 100%);
+      border: 4px solid #444;
+      overflow: hidden;
+    }
+
+    #battleInfo {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      font-weight: bold;
+      background: rgba(26,26,26,0.92);
+      padding: 10px 22px;
+      border-radius: 8px;
+      z-index: 50;
+      white-space: nowrap;
+    }
+
+    /* Players */
+    .player {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: bold;
+      z-index: 10;
+      user-select: none;
+    }
+    .player-name {
+      position: absolute;
+      top: -24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: bold;
+      white-space: nowrap;
+      background: rgba(0,0,0,0.8);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .health-bar {
+      position: absolute;
+      top: -42px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 14px;
+      background: #333;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .health-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #4ade80, #22c55e);
+      transition: width 0.25s;
+    }
+    .health-text {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      text-align: center;
+      line-height: 14px;
+      font-size: 9px;
+      font-weight: bold;
+      text-shadow: 0 0 4px rgba(0,0,0,0.9);
+    }
+
+    /* Damage numbers */
+    .damage-number {
+      position: absolute;
+      font-size: 26px;
+      font-weight: bold;
+      pointer-events: none;
+      animation: floatUp 0.9s ease-out forwards;
+      z-index: 100;
+      text-shadow: 0 0 8px rgba(0,0,0,0.8);
+    }
+    .dmg-normal { color: #ff4444; }
+    .dmg-critical { color: var(--gold); font-size: 34px; }
+    .dmg-weak { color: #666; font-size: 18px; }
+    @keyframes floatUp {
+      0%   { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-70px); }
+    }
+
+    /* Dash afterimage */
+    .dash-afterimage {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 5;
+      animation: fadeOut 0.45s ease-out forwards;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    @keyframes fadeOut {
+      0%   { opacity: 0.55; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.7); }
+    }
+
+    /* Sword swing */
+    .sword-swing {
+      position: absolute;
+      width: 56px;
+      height: 4px;
+      background: #fff;
+      border-radius: 2px;
+      pointer-events: none;
+    }
+
+    /* Attack meter */
+    #attackMeter {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      background: rgba(26,26,26,0.88);
+      border: 2px solid rgba(51,51,51,0.8);
+      border-radius: 12px;
+      padding: 12px;
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+    #meterLabel { text-align: center; margin-bottom: 8px; font-size: 13px; font-weight: bold; }
+    #meterBar { width: 100%; height: 22px; background: #333; border-radius: 6px; overflow: hidden; }
+    #meterFill {
+      width: 0%;
+      height: 100%;
+      transition: width 0.05s linear;
+      background: linear-gradient(90deg, #333 0%, #ef4444 10%, #fbbf24 50%, #4ade80 100%);
+    }
+    #attackInstruction { text-align: center; margin-top: 6px; font-size: 11px; color: #666; }
+
+    /* Dash indicator */
+    #dashCooldown {
+      position: fixed;
+      right: 28px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 64px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    #dashLabel { font-size: 13px; font-weight: bold; color: #a78bfa; }
+    #dashIcon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      border: 3px solid #a78bfa;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    #dashIcon.ready { animation: pulse 1.5s infinite; }
+    #dashIcon.cooling { opacity: 0.45; cursor: not-allowed; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 18px var(--purple); }
+      50%       { box-shadow: 0 0 36px #a78bfa; }
+    }
+    #dashBarContainer {
+      width: 100%;
+      height: 180px;
+      background: rgba(26,26,26,0.88);
+      border: 2px solid rgba(51,51,51,0.8);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      backdrop-filter: blur(4px);
+    }
+    #dashBarFill {
+      width: 100%;
+      height: 0%;
+      background: linear-gradient(180deg, var(--purple), #6366f1);
+      position: absolute;
+      bottom: 0; left: 0;
+      transition: height 0.1s linear;
+    }
+    #dashCooldownText {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 16px;
+      font-weight: bold;
+      text-shadow: 0 0 6px rgba(0,0,0,0.8);
+      z-index: 1;
+    }
+
+    /* ── RESULTS SCREEN ── */
+    #resultsScreen { gap: 20px; }
+    #resultTitle { font-size: 52px; }
+    #eloChange { font-size: 28px; font-weight: bold; }
+    .elo-gain { color: var(--green); }
+    .elo-loss { color: var(--red); }
+    #resultStats { font-size: 15px; color: #888; }
+    .btn {
+      padding: 16px 48px;
+      background: var(--gold-btn);
+      border: 2px solid var(--gold-dark);
+      border-radius: 8px;
+      color: #000;
+      font-weight: bold;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: var(--gold-dark); transform: scale(1.04); }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════ AUTH SCREEN ══════════════════════════════ -->
+<div id="authScreen" class="screen active">
+  <h1>⚔️ GLADIATOR ARENA</h1>
+  <div class="auth-box">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
+      <button class="auth-tab" onclick="switchAuthTab('register')">Register</button>
+    </div>
+    <input class="auth-input" id="authUsername" type="text" placeholder="Username" maxlength="20" autocomplete="off" />
+    <input class="auth-input" id="authPassword" type="password" placeholder="Password" maxlength="64" />
+    <div class="auth-message" id="authMsg"></div>
+    <button class="auth-btn" id="authSubmitBtn" onclick="submitAuth()">LOGIN</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ LOBBY SCREEN ═════════════════════════════ -->
+<div id="lobbyScreen" class="screen">
+  <div class="lobby-left">
+    <h1>⚔️ GLADIATOR ARENA</h1>
+
+    <div id="eloDisplay">
+      <div class="elo-label">Your ELO</div>
+      <div id="eloValue">1000</div>
+      <div class="elo-sub" id="wlRecord">W: 0 / L: 0</div>
+    </div>
+
+    <div class="queue-panel">
+      <div class="match-type-selector">
+        <button class="match-type-btn active" onclick="selectMatchType('pvp', this)">🎮 PvP</button>
+        <button class="match-type-btn" onclick="selectMatchType('bot', this)">🤖 vs Bot</button>
+      </div>
+
+      <div id="botDiffWrap" style="display:none; width:100%">
+        <div style="margin-bottom:8px; color:#888; font-size:13px; text-align:center">Select Difficulty</div>
+        <div class="difficulty-grid">
+          <div class="difficulty-btn selected" onclick="selectDifficulty('easy', this)">
+            <div class="diff-name">😊 Easy</div>
+            <div class="diff-desc">ELO ~700</div>
+          </div>
+          <div class="difficulty-btn" onclick="selectDifficulty('medium', this)">
+            <div class="diff-name">😐 Medium</div>
+            <div class="diff-desc">ELO ~1400</div>
+          </div>
+          <div class="difficulty-btn" onclick="selectDifficulty('hard', this)">
+            <div class="diff-name">😤 Hard</div>
+            <div class="diff-desc">ELO ~3000</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="findMatchBtn" onclick="toggleQueue()">FIND MATCH</button>
+      <div id="queueMsg"></div>
+      <div id="queueCountWrap">Players in queue: <span id="queueCount">0</span></div>
+    </div>
+
+    <button class="logout-btn" onclick="logout()">← Log Out</button>
+  </div>
+
+  <div class="lb-panel">
+    <div class="lb-tabs">
+      <button class="lb-tab active" onclick="switchLbTab('online', this)">👥 Online</button>
+      <button class="lb-tab" onclick="switchLbTab('alltime', this)">🏆 All-Time</button>
+    </div>
+    <div id="lbList"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ BATTLE SCREEN ════════════════════════════ -->
+<div id="battleScreen" class="screen">
+  <div id="battleArena">
+    <div id="battleInfo">FIGHT!</div>
+
+    <div id="attackMeter">
+      <div id="meterLabel">Swing Power</div>
+      <div id="meterBar"><div id="meterFill"></div></div>
+      <div id="attackInstruction">WASD / Arrow Keys to move · Click to attack · Space to dash (aim with mouse)</div>
+    </div>
+
+    <div id="dashCooldown">
+      <div id="dashLabel">DASH</div>
+      <div id="dashIcon" class="ready">⚡</div>
+      <div id="dashBarContainer">
+        <div id="dashBarFill"></div>
+        <div id="dashCooldownText">READY</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ RESULTS SCREEN ═══════════════════════════ -->
+<div id="resultsScreen" class="screen">
+  <h1 id="resultTitle"></h1>
+  <div id="eloChange"></div>
+  <div id="resultStats"></div>
+  <button class="btn" onclick="returnToLobby()">RETURN TO LOBBY</button>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  CONSTANTS
+// ════════════════════════════════════════════════════════════════
+const RELAY_SERVER     = 'https://gladiatorgame.onrender.com'; // ← change to your server URL
+const ROOM_ID          = 'gladiator_arena';
+const ATTACK_CHARGE_MS = 2500;
+const PLAYER_SPEED     = 3;
+const ATTACK_RANGE     = 80;
+const K_FACTOR         = 60;
+const DASH_COOLDOWN_MS = 3000;
+const DASH_DISTANCE    = 200;
+
+// ════════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════════
+let ws = null;
+let clientId = null;
+
+// Auth
+let myUsername = null;
+let myElo = 1000;
+let myWins = 0, myLosses = 0;
+let sessionToken = null;   // stored in sessionStorage only (not localStorage)
+let authMode = 'login';
+
+// Lobby
+let matchType = 'pvp';
+let selectedDiff = 'easy';
+let inQueue = false;
+let lbTab = 'online';
+
+// Battle
+let currentMatch = null;
+let players = new Map();
+let myHealth = 100, oppHealth = 100;
+let keys = {};
+let meterCharge = 0;
+let canAttack = true;
+let isCharging = false;
+let chargeInterval = null;
+let posUpdateInterval = null;
+let dashCooldownLeft = 0;
+let dashCooldownTimer = null;
+let isDashing = false;
+let mouseX = 0, mouseY = 0;
+let heartbeatInterval = null;
+let lbInterval = null;
+
+// ════════════════════════════════════════════════════════════════
+//  WEBSOCKET
+// ════════════════════════════════════════════════════════════════
+function connectWS() {
+  return new Promise((resolve, reject) => {
+    ws = new WebSocket(RELAY_SERVER);
+    ws.onopen = () => resolve();
+    ws.onerror = () => reject(new Error('WebSocket connection failed'));
+    ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
+    ws.onclose = () => {
+      console.log('WS closed');
+      // Could add reconnect logic here
+    };
+  });
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+function sendAction(action, data) {
+  send({ type: 'player_action', action, data });
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MESSAGE HANDLER
+// ════════════════════════════════════════════════════════════════
+function handleMessage(data) {
+  switch (data.type) {
+    case 'connected':
+      clientId = data.clientId;
+      tryResumeSession();
+      break;
+
+    case 'register_result': onRegisterResult(data); break;
+    case 'login_result':    onLoginResult(data);    break;
+    case 'session_result':  onSessionResult(data);  break;
+    case 'logout_result':   onLogoutResult(data);   break;
+
+    case 'joined':
+      updateLobbyFromPlayers(data.players || []);
+      break;
+    case 'players_update':
+      updateLobbyFromPlayers(data.players || []);
+      break;
+    case 'player_joined':
+    case 'player_left':
+      if (currentMatch && data.player && data.player.username === currentMatch.opponent) {
+        endMatch(true, true);
+      }
+      break;
+
+    case 'queue_count':
+      document.getElementById('queueCount').textContent = data.count || 0;
+      break;
+
+    case 'leaderboard_data':
+      renderAllTimeLeaderboard(data.leaderboard || []);
+      break;
+
+    case 'elo_updated':
+      myElo = data.elo;
+      document.getElementById('eloValue').textContent = myElo;
+      break;
+
+    case 'player_action':
+      handleIncomingAction(data);
+      break;
+
+    case 'error':
+      console.warn('Server error:', data.message);
+      break;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════════════
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && mode === 'login') || (i === 1 && mode === 'register'));
+  });
+  document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT';
+  document.getElementById('authMsg').textContent = '';
+  document.getElementById('authMsg').className = 'auth-message';
+}
+
+function setAuthMsg(msg, success = false) {
+  const el = document.getElementById('authMsg');
+  el.textContent = msg;
+  el.className = 'auth-message' + (success ? ' success' : '');
+}
+
+function submitAuth() {
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!username || !password) { setAuthMsg('Please fill in all fields'); return; }
+
+  const btn = document.getElementById('authSubmitBtn');
+  btn.disabled = true;
+  setAuthMsg('');
+
+  if (authMode === 'register') {
+    send({ type: 'register', username, password });
+  } else {
+    send({ type: 'login', username, password });
+  }
+
+  setTimeout(() => { btn.disabled = false; }, 3000);
+}
+
+function onRegisterResult(data) {
+  document.getElementById('authSubmitBtn').disabled = false;
+  if (data.success) {
+    setAuthMsg('Account created! Logging in...', true);
+    sessionToken = data.token;
+    sessionStorage.setItem('gladToken', sessionToken);
+    finishLogin(data);
+  } else {
+    setAuthMsg(data.message || 'Registration failed');
+  }
+}
+
+function onLoginResult(data) {
+  document.getElementById('authSubmitBtn').disabled = false;
+  if (data.success) {
+    sessionToken = data.token;
+    sessionStorage.setItem('gladToken', sessionToken);
+    finishLogin(data);
+  } else {
+    setAuthMsg(data.message || 'Login failed');
+  }
+}
+
+function onSessionResult(data) {
+  if (data.success) {
+    finishLogin(data);
+  } else {
+    // Session invalid → show auth screen (already showing)
+    sessionStorage.removeItem('gladToken');
+  }
+}
+
+function tryResumeSession() {
+  const token = sessionStorage.getItem('gladToken');
+  if (token) {
+    sessionToken = token;
+    send({ type: 'resume_session', token });
+  }
+}
+
+function finishLogin(data) {
+  myUsername = data.username;
+  myElo = data.elo || 1000;
+  myWins = data.wins || 0;
+  myLosses = data.losses || 0;
+
+  document.getElementById('eloValue').textContent = myElo;
+  document.getElementById('wlRecord').textContent = `W: ${myWins} / L: ${myLosses}`;
+
+  send({ type: 'join_room', room: ROOM_ID });
+  showScreen('lobbyScreen');
+  startHeartbeat();
+  startLbUpdates();
+}
+
+function logout() {
+  send({ type: 'logout', token: sessionToken });
+}
+
+function onLogoutResult() {
+  sessionStorage.removeItem('gladToken');
+  sessionToken = null;
+  myUsername = null;
+  stopHeartbeat();
+  stopLbUpdates();
+  inQueue = false;
+  currentMatch = null;
+  showScreen('authScreen');
+}
+
+// Enter key on auth inputs
+document.getElementById('authUsername').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+document.getElementById('authPassword').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+
+// ════════════════════════════════════════════════════════════════
+//  LOBBY
+// ════════════════════════════════════════════════════════════════
+function selectMatchType(type, btn) {
+  matchType = type;
+  document.querySelectorAll('.match-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('botDiffWrap').style.display = type === 'bot' ? 'block' : 'none';
+  document.getElementById('queueCountWrap').style.display = type === 'pvp' ? 'block' : 'none';
+}
+
+function selectDifficulty(diff, el) {
+  selectedDiff = diff;
+  document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function toggleQueue() {
+  if (matchType === 'bot') { startBotMatch(); return; }
+  if (inQueue) {
+    inQueue = false;
+    document.getElementById('findMatchBtn').textContent = 'FIND MATCH';
+    document.getElementById('queueMsg').textContent = '';
+    sendAction('leave_queue', {});
+  } else {
+    inQueue = true;
+    document.getElementById('findMatchBtn').textContent = 'CANCEL';
+    document.getElementById('queueMsg').textContent = 'Searching for opponent...';
+    sendAction('join_queue', { elo: myElo, username: myUsername });
+  }
+}
+
+// ── Leaderboard ──────────────────────────────────────────────────
+function switchLbTab(tab, btn) {
+  lbTab = tab;
+  document.querySelectorAll('.lb-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (tab === 'alltime') send({ type: 'get_leaderboard' });
+  else { send({ type: 'get_players' }); }
+}
+
+function updateLobbyFromPlayers(playerList) {
+  if (lbTab !== 'online') return;
+  const sorted = [...playerList].sort((a, b) => (b.elo || 1000) - (a.elo || 1000));
+  renderLeaderboard(sorted.slice(0, 10), p => p.elo || 1000);
+}
+
+function renderAllTimeLeaderboard(list) {
+  if (lbTab !== 'alltime') return;
+  renderLeaderboard(list, p => p.elo || 1000);
+}
+
+function renderLeaderboard(list, eloFn) {
+  const el = document.getElementById('lbList');
+  el.innerHTML = '';
+  if (!list.length) {
+    el.innerHTML = '<div style="color:#555;text-align:center;padding:20px">No players yet</div>';
+    return;
+  }
+  list.forEach((p, i) => {
+    const isMe = p.username === myUsername;
+    const div = document.createElement('div');
+    div.className = 'lb-entry';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:4px">
+        <span class="lb-rank">#${i + 1}</span>
+        <span>${p.username}${isMe ? ' <span class="lb-you">(you)</span>' : ''}</span>
+      </div>
+      <span class="lb-elo">${eloFn(p)}</span>
+    `;
+    el.appendChild(div);
+  });
+}
+
+// ── Heartbeat & polling ───────────────────────────────────────────
+function startHeartbeat() {
+  stopHeartbeat();
+  heartbeatInterval = setInterval(() => {
+    send({ type: 'heartbeat', inQueue, inMatch: !!currentMatch });
+    if (!currentMatch) send({ type: 'get_queue_count' });
+  }, 3000);
+}
+function stopHeartbeat() {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+}
+function startLbUpdates() {
+  stopLbUpdates();
+  lbInterval = setInterval(() => {
+    if (!currentMatch) {
+      send({ type: 'get_players' });
+      if (lbTab === 'alltime') send({ type: 'get_leaderboard' });
+    }
+  }, 2000);
+}
+function stopLbUpdates() {
+  if (lbInterval) clearInterval(lbInterval);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MATCHMAKING
+// ════════════════════════════════════════════════════════════════
+function handleIncomingAction(data) {
+  const action = data.action;
+
+  if (action === 'join_queue' && inQueue && !currentMatch && data.playerId !== clientId) {
+    const oppData = data.actionData;
+    startMatchAsInitiator(data.playerId, oppData);
+  } else if (action === 'match_start' && data.actionData && data.actionData.opponentId === clientId) {
+    acceptMatch(data.playerId, data.actionData);
+  } else if (action === 'player_move' && currentMatch && data.playerId === currentMatch.opponentId) {
+    updateOpponentPos(data.actionData);
+  } else if (action === 'attack' && currentMatch && data.playerId === currentMatch.opponentId) {
+    handleOpponentAttack(data.actionData);
+  } else if (action === 'dash' && currentMatch && data.playerId === currentMatch.opponentId) {
+    handleOpponentDash(data.actionData);
+  }
+}
+
+function startMatchAsInitiator(oppId, oppData) {
+  inQueue = false;
+  document.getElementById('findMatchBtn').textContent = 'FIND MATCH';
+  document.getElementById('queueMsg').textContent = '';
+
+  currentMatch = {
+    opponent: oppData.username || 'Opponent',
+    opponentId: oppId,
+    opponentElo: oppData.elo || 1000,
+    isBot: false
+  };
+
+  sendAction('match_start', {
+    opponentId: oppId,
+    myUsername,
+    myElo,
+    matchId: Date.now() + '_' + Math.random()
+  });
+
+  showScreen('battleScreen');
+  initBattle();
+}
+
+function acceptMatch(oppId, matchData) {
+  inQueue = false;
+  document.getElementById('findMatchBtn').textContent = 'FIND MATCH';
+  document.getElementById('queueMsg').textContent = '';
+
+  currentMatch = {
+    opponent: matchData.myUsername || 'Opponent',
+    opponentId: oppId,
+    opponentElo: matchData.myElo || 1000,
+    isBot: false
+  };
+
+  showScreen('battleScreen');
+  initBattle();
+}
+
+function startBotMatch() {
+  const botEloMap = { easy: 700, medium: 1400, hard: 3000 };
+  currentMatch = {
+    opponent: selectedDiff.toUpperCase() + ' Bot',
+    opponentId: 'bot_' + Date.now(),
+    opponentElo: botEloMap[selectedDiff],
+    isBot: true,
+    botDiff: selectedDiff
+  };
+  showScreen('battleScreen');
+  initBattle();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BATTLE — INIT
+// ════════════════════════════════════════════════════════════════
+function initBattle() {
+  myHealth = 100;
+  oppHealth = 100;
+  players.clear();
+  keys = {};
+  meterCharge = 0;
+  canAttack = true;
+  isCharging = false;
+  if (chargeInterval) { clearInterval(chargeInterval); chargeInterval = null; }
+  document.getElementById('meterFill').style.width = '0%';
+
+  // Clear old player elements
+  document.querySelectorAll('.player').forEach(el => el.remove());
+
+  const maxX = window.innerWidth / 2 - 100;
+  const maxY = window.innerHeight / 2 - 150;
+
+  const [myX, myY, oppX, oppY] = (currentMatch.isBot || clientId < currentMatch.opponentId)
+    ? [-maxX, -maxY, maxX, maxY]
+    : [maxX, maxY, -maxX, -maxY];
+
+  const myEl  = createPlayerEl(myUsername, '#3b82f6', myX, myY, true);
+  const oppEl = createPlayerEl(currentMatch.opponent, '#ef4444', oppX, oppY, false);
+
+  players.set(clientId, { element: myEl,  x: myX,  y: myY,  health: 100, isBot: false });
+  players.set(currentMatch.opponentId, {
+    element: oppEl, x: oppX, y: oppY, health: 100,
+    isBot: currentMatch.isBot,
+    botDiff: currentMatch.botDiff,
+    charge: 0, canAttack: true, dashReady: true,
+    justGotHit: false
+  });
+
+  document.getElementById('battleInfo').textContent =
+    `${myUsername} (${myElo}) VS ${currentMatch.opponent} (${currentMatch.opponentElo})`;
+
+  resetDashUI();
+  startGameLoop();
+  if (!currentMatch.isBot) startPositionUpdates();
+}
+
+function createPlayerEl(username, color, x, y, isMe) {
+  const el = document.createElement('div');
+  el.className = 'player';
+  el.style.background = color;
+  el.textContent = '⚔️';
+
+  const nameTag = document.createElement('div');
+  nameTag.className = 'player-name';
+  nameTag.textContent = username + (isMe ? ' (YOU)' : '');
+  el.appendChild(nameTag);
+
+  const hbar = document.createElement('div');
+  hbar.className = 'health-bar';
+  hbar.innerHTML = '<div class="health-fill"></div><div class="health-text">100/100</div>';
+  el.appendChild(hbar);
+
+  setPlayerPos(el, x, y);
+  document.getElementById('battleArena').appendChild(el);
+  return el;
+}
+
+function setPlayerPos(el, x, y) {
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  el.style.left = (cx + x - 22) + 'px';
+  el.style.top  = (cy + y - 22) + 'px';
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BATTLE — GAME LOOP
+// ════════════════════════════════════════════════════════════════
+function startGameLoop() {
+  document.removeEventListener('keydown', onKeyDown);
+  document.removeEventListener('keyup',   onKeyUp);
+  document.removeEventListener('click',   onAttack);
+  document.removeEventListener('mousemove', onMouseMove);
+
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup',   onKeyUp);
+  document.addEventListener('click',   onAttack);
+  document.addEventListener('mousemove', onMouseMove);
+
+  isCharging = true;
+  startCharging();
+  requestAnimationFrame(gameLoop);
+}
+
+function onKeyDown(e) {
+  keys[e.key] = true;
+  if (e.key === ' ' && !isDashing && dashCooldownLeft === 0 && currentMatch) {
+    e.preventDefault();
+    performDash();
+  }
+}
+function onKeyUp(e) { keys[e.key] = false; }
+function onMouseMove(e) { mouseX = e.clientX; mouseY = e.clientY; }
+
+function gameLoop() {
+  if (!currentMatch) return;
+
+  const me = players.get(clientId);
+  if (!me) return;
+
+  let dx = 0, dy = 0;
+  if (keys['ArrowUp']    || keys['w']) dy -= PLAYER_SPEED;
+  if (keys['ArrowDown']  || keys['s']) dy += PLAYER_SPEED;
+  if (keys['ArrowLeft']  || keys['a']) dx -= PLAYER_SPEED;
+  if (keys['ArrowRight'] || keys['d']) dx += PLAYER_SPEED;
+
+  if (dx || dy) {
+    const maxX = window.innerWidth  / 2 - 60;
+    const maxY = window.innerHeight / 2 - 100;
+    const nx = me.x + dx, ny = me.y + dy;
+    if (Math.abs(nx) < maxX) me.x = nx;
+    if (Math.abs(ny) < maxY) me.y = ny;
+    setPlayerPos(me.element, me.x, me.y);
+  }
+
+  // Bot AI
+  const opp = players.get(currentMatch.opponentId);
+  if (opp && opp.isBot) {
+    updateBotCharge(opp);
+    if (opp.botDiff === 'easy')   easyBot(opp, me);
+    if (opp.botDiff === 'medium') mediumBot(opp, me);
+    if (opp.botDiff === 'hard')   hardBot(opp, me);
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ATTACK METER
+// ════════════════════════════════════════════════════════════════
+function startCharging() {
+  if (chargeInterval) clearInterval(chargeInterval);
+  chargeInterval = setInterval(() => {
+    if (meterCharge < 100) {
+      meterCharge = Math.min(100, meterCharge + (100 / (ATTACK_CHARGE_MS / 50)));
+      document.getElementById('meterFill').style.width = meterCharge + '%';
+    }
+  }, 50);
+}
+
+function onAttack() {
+  if (!canAttack || !currentMatch) return;
+  const me  = players.get(clientId);
+  const opp = players.get(currentMatch.opponentId);
+  if (!me || !opp) return;
+
+  const dist = dist2D(me, opp);
+  let damage = 0, hitType = 'miss';
+
+  if (dist <= ATTACK_RANGE) {
+    if (meterCharge < 10)       { damage = 1;  hitType = 'weak'; }
+    else if (meterCharge >= 90) { damage = 25; hitType = 'critical'; }
+    else                        { damage = Math.floor(meterCharge / 100 * 25); hitType = 'normal'; }
+  }
+
+  showSwordSwing(me.element);
+
+  if (currentMatch.isBot) {
+    if (damage > 0) {
+      oppHealth = Math.max(0, oppHealth - damage);
+      opp.health = oppHealth;
+      opp.justGotHit = true;
+      updateHealth(opp.element, oppHealth);
+      showDamageNum(damage, hitType, opp.element);
+      if (oppHealth <= 0) endMatch(true, false);
+    }
+  } else {
+    sendAction('attack', { damage, hitType, attackerPos: { x: me.x, y: me.y } });
+    if (damage > 0) {
+      oppHealth = Math.max(0, oppHealth - damage);
+      updateHealth(opp.element, oppHealth);
+      showDamageNum(damage, hitType, opp.element);
+      if (oppHealth <= 0) endMatch(true, false);
+    }
+  }
+
+  meterCharge = 0;
+  document.getElementById('meterFill').style.width = '0%';
+}
+
+function handleOpponentAttack(data) {
+  const { damage, hitType } = data;
+  const me = players.get(clientId);
+  if (damage > 0) {
+    myHealth = Math.max(0, myHealth - damage);
+    updateHealth(me.element, myHealth);
+    showDamageNum(damage, hitType, me.element);
+    if (myHealth <= 0) endMatch(false, false);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  DASH
+// ════════════════════════════════════════════════════════════════
+function performDash() {
+  if (isDashing || dashCooldownLeft > 0 || !currentMatch) return;
+  const me = players.get(clientId);
+  if (!me) return;
+
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  const dx = mouseX - (cx + me.x);
+  const dy = mouseY - (cy + me.y);
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  if (mag < 5) return;
+
+  const ndx = dx / mag, ndy = dy / mag;
+  isDashing = true;
+
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => makeAfterimage(me.x, me.y, '#3b82f6'), i * 20);
+  }
+
+  const steps = 10;
+  let step = 0;
+  const iv = setInterval(() => {
+    if (step >= steps || !currentMatch) {
+      clearInterval(iv); isDashing = false; startDashCooldown(); return;
+    }
+    const maxX = window.innerWidth / 2 - 60;
+    const maxY = window.innerHeight / 2 - 100;
+    const nx = me.x + ndx * (DASH_DISTANCE / steps);
+    const ny = me.y + ndy * (DASH_DISTANCE / steps);
+    if (Math.abs(nx) < maxX) me.x = nx;
+    if (Math.abs(ny) < maxY) me.y = ny;
+    setPlayerPos(me.element, me.x, me.y);
+    step++;
+  }, 20);
+
+  if (!currentMatch.isBot) sendAction('dash', { startX: me.x, startY: me.y, directionX: ndx, directionY: ndy });
+}
+
+function handleOpponentDash(data) {
+  const opp = players.get(currentMatch.opponentId);
+  if (!opp) return;
+  for (let i = 0; i < 5; i++) setTimeout(() => makeAfterimage(opp.x, opp.y, '#ef4444'), i * 20);
+}
+
+function startDashCooldown() {
+  dashCooldownLeft = DASH_COOLDOWN_MS;
+  const fill = document.getElementById('dashBarFill');
+  const txt  = document.getElementById('dashCooldownText');
+  const icon = document.getElementById('dashIcon');
+  icon.className = 'cooling';
+
+  if (dashCooldownTimer) clearInterval(dashCooldownTimer);
+  dashCooldownTimer = setInterval(() => {
+    dashCooldownLeft -= 100;
+    if (dashCooldownLeft <= 0) {
+      dashCooldownLeft = 0;
+      clearInterval(dashCooldownTimer);
+      fill.style.height = '100%';
+      txt.textContent = 'READY';
+      icon.className = 'ready';
+    } else {
+      fill.style.height = ((1 - dashCooldownLeft / DASH_COOLDOWN_MS) * 100) + '%';
+      txt.textContent = (dashCooldownLeft / 1000).toFixed(1) + 's';
+    }
+  }, 100);
+}
+
+function resetDashUI() {
+  dashCooldownLeft = 0;
+  isDashing = false;
+  if (dashCooldownTimer) clearInterval(dashCooldownTimer);
+  document.getElementById('dashBarFill').style.height = '0%';
+  document.getElementById('dashCooldownText').textContent = 'READY';
+  document.getElementById('dashIcon').className = 'ready';
+}
+
+function makeAfterimage(x, y, color) {
+  const el = document.createElement('div');
+  el.className = 'dash-afterimage';
+  el.style.background = color;
+  el.textContent = '⚔️';
+  setPlayerPos(el, x, y);
+  document.getElementById('battleArena').appendChild(el);
+  setTimeout(() => el.remove(), 450);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  POSITION SYNC (PvP)
+// ════════════════════════════════════════════════════════════════
+function startPositionUpdates() {
+  if (posUpdateInterval) clearInterval(posUpdateInterval);
+  posUpdateInterval = setInterval(() => {
+    if (!ws || !currentMatch) return;
+    const me = players.get(clientId);
+    if (me) sendAction('player_move', { x: me.x, y: me.y });
+
+    const opp = players.get(currentMatch.opponentId);
+    if (opp && (Date.now() - (opp.lastUpdate || Date.now())) > 8000) {
+      endMatch(true, true);
+    }
+  }, 50);
+}
+
+function updateOpponentPos(data) {
+  const opp = players.get(currentMatch.opponentId);
+  if (!opp) return;
+  opp.x = data.x; opp.y = data.y; opp.lastUpdate = Date.now();
+  setPlayerPos(opp.element, data.x, data.y);
+}
+
+function stopPositionUpdates() {
+  if (posUpdateInterval) { clearInterval(posUpdateInterval); posUpdateInterval = null; }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BOT AI
+// ════════════════════════════════════════════════════════════════
+function updateBotCharge(bot) {
+  if (!bot.canAttack) { bot.lastCharge = Date.now(); return; }
+  const now = Date.now();
+  if (!bot.lastCharge) bot.lastCharge = now;
+  const dt = now - bot.lastCharge;
+  bot.charge = Math.min(100, (bot.charge || 0) + (dt / ATTACK_CHARGE_MS) * 100);
+  bot.lastCharge = now;
+}
+
+function botMove(bot, targetX, targetY, speed = PLAYER_SPEED) {
+  const dx = targetX - bot.x, dy = targetY - bot.y;
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  if (mag < 2) return;
+  const maxX = window.innerWidth / 2 - 60;
+  const maxY = window.innerHeight / 2 - 100;
+  const nx = bot.x + (dx / mag) * speed;
+  const ny = bot.y + (dy / mag) * speed;
+  if (Math.abs(nx) < maxX) bot.x = nx;
+  if (Math.abs(ny) < maxY) bot.y = ny;
+  setPlayerPos(bot.element, bot.x, bot.y);
+}
+
+function botAttack(bot, player) {
+  if (!bot.canAttack) return;
+  const damage = bot.charge >= 90 ? 25 : bot.charge < 10 ? 1 : Math.floor(bot.charge / 100 * 25);
+  const hitType = bot.charge >= 90 ? 'critical' : bot.charge < 10 ? 'weak' : 'normal';
+  showSwordSwing(bot.element);
+  player.health = Math.max(0, player.health - damage);
+  myHealth = player.health;
+  updateHealth(player.element, player.health);
+  showDamageNum(damage, hitType, player.element);
+  bot.charge = 0; bot.canAttack = false; bot.justGotHit = false;
+  setTimeout(() => { if (bot) bot.canAttack = true; }, 200);
+  if (player.health <= 0 && currentMatch) endMatch(false, false);
+}
+
+function botDash(bot, tx, ty) {
+  if (!bot.dashReady) return;
+  const maxX = window.innerWidth / 2 - 60;
+  const maxY = window.innerHeight / 2 - 100;
+  for (let i = 0; i < 4; i++) setTimeout(() => makeAfterimage(bot.x, bot.y, '#ef4444'), i * 20);
+  bot.x = Math.max(-maxX, Math.min(maxX, tx));
+  bot.y = Math.max(-maxY, Math.min(maxY, ty));
+  setPlayerPos(bot.element, bot.x, bot.y);
+  bot.dashReady = false;
+  setTimeout(() => { if (bot) bot.dashReady = true; }, DASH_COOLDOWN_MS);
+}
+
+function easyBot(bot, player) {
+  const d = dist2D(bot, player);
+  const dx = player.x - bot.x, dy = player.y - bot.y;
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  if (d > ATTACK_RANGE + 20) botMove(bot, player.x, player.y);
+  if (d <= ATTACK_RANGE && bot.charge >= 10 && bot.canAttack) botAttack(bot, player);
+  if (bot.justGotHit && bot.dashReady && Math.random() > 0.15)
+    botDash(bot, bot.x - (dx / mag) * DASH_DISTANCE, bot.y - (dy / mag) * DASH_DISTANCE);
+}
+
+function mediumBot(bot, player) {
+  const d = dist2D(bot, player);
+  const dx = player.x - bot.x, dy = player.y - bot.y;
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  const targetDist = ATTACK_RANGE - 5;
+
+  if (d > targetDist + 10) botMove(bot, player.x, player.y);
+  else if (d < targetDist - 10) botMove(bot, bot.x - dx / mag * PLAYER_SPEED, bot.y - dy / mag * PLAYER_SPEED);
+
+  if (d <= ATTACK_RANGE && bot.charge >= 80 && bot.canAttack)
+    setTimeout(() => { if (bot && players.get(currentMatch?.opponentId)) botAttack(bot, player); }, 200);
+
+  if (meterCharge >= 88 && d < 85 && bot.dashReady && Math.random() > 0.3) {
+    const px = -dy / mag, py = dx / mag, dir = Math.random() > 0.5 ? 1 : -1;
+    botDash(bot, bot.x + px * DASH_DISTANCE * dir, bot.y + py * DASH_DISTANCE * dir);
+  }
+}
+
+function hardBot(bot, player) {
+  const d = dist2D(bot, player);
+  const dx = player.x - bot.x, dy = player.y - bot.y;
+  const mag = Math.sqrt(dx * dx + dy * dy);
+
+  // Dodge when player is about to crit
+  if (meterCharge >= 88 && d < 100 && bot.dashReady && Math.random() > 0.15) {
+    const px = -dy / mag, py = dx / mag, dir = Math.random() > 0.5 ? 1 : -1;
+    botDash(bot, bot.x + px * DASH_DISTANCE * dir, bot.y + py * DASH_DISTANCE * dir);
+    return;
+  }
+
+  // Maintain optimal distance
+  const target = meterCharge >= 85 ? 95 : 68;
+  if (d > target + 5)      botMove(bot, player.x, player.y);
+  else if (d < target - 5) botMove(bot, bot.x - dx / mag * PLAYER_SPEED, bot.y - dy / mag * PLAYER_SPEED);
+  else {
+    // Sidestep
+    const px = -dy / mag, py = dx / mag;
+    const dir = Math.sin(Date.now() / 200) > 0 ? 1 : -1;
+    botMove(bot, bot.x + px * dir, bot.y + py * dir);
+  }
+
+  if (d <= ATTACK_RANGE && bot.charge >= 88 && bot.canAttack) botAttack(bot, player);
+
+  if (meterCharge < 65 && d > 120 && bot.charge >= 85 && bot.dashReady && Math.random() > 0.35)
+    botDash(bot, bot.x + dx / mag * DASH_DISTANCE, bot.y + dy / mag * DASH_DISTANCE);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════════════════════
+function updateHealth(el, hp) {
+  const fill = el.querySelector('.health-fill');
+  const text = el.querySelector('.health-text');
+  fill.style.width = hp + '%';
+  text.textContent = hp + '/100';
+  fill.style.background = hp > 50 ? 'linear-gradient(90deg,#4ade80,#22c55e)'
+    : hp > 25 ? 'linear-gradient(90deg,#fbbf24,#f59e0b)'
+    : 'linear-gradient(90deg,#ef4444,#dc2626)';
+}
+
+function showDamageNum(damage, hitType, el) {
+  const div = document.createElement('div');
+  div.className = 'damage-number dmg-' + (hitType === 'critical' ? 'critical' : hitType === 'weak' ? 'weak' : 'normal');
+  div.textContent = '-' + damage;
+  const r = el.getBoundingClientRect();
+  div.style.left = (r.left + r.width / 2) + 'px';
+  div.style.top  = r.top + 'px';
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 900);
+}
+
+function showSwordSwing(el) {
+  const swing = document.createElement('div');
+  swing.className = 'sword-swing';
+  const r = el.getBoundingClientRect();
+  swing.style.left = (r.left + r.width / 2) + 'px';
+  swing.style.top  = (r.top  + r.height / 2) + 'px';
+  document.body.appendChild(swing);
+  setTimeout(() => swing.remove(), 180);
+}
+
+function dist2D(a, b) {
+  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MATCH END
+// ════════════════════════════════════════════════════════════════
+function calcEloChange(myElo, oppElo, won) {
+  const expected = 1 / (1 + Math.pow(10, (oppElo - myElo) / 400));
+  return Math.round(K_FACTOR * ((won ? 1 : 0) - expected));
+}
+
+function endMatch(won, disconnected) {
+  if (!currentMatch) return;
+
+  stopPositionUpdates();
+  if (chargeInterval) { clearInterval(chargeInterval); chargeInterval = null; }
+
+  document.removeEventListener('keydown', onKeyDown);
+  document.removeEventListener('keyup',   onKeyUp);
+  document.removeEventListener('click',   onAttack);
+
+  const isBot = currentMatch.isBot;
+  const eloChange = isBot ? 0 : calcEloChange(myElo, currentMatch.opponentElo, won);
+  const newElo    = isBot ? myElo : Math.max(100, myElo + eloChange);
+
+  if (!isBot) {
+    // Tell server to update ELO and W/L record
+    send({ type: 'update_elo', elo: newElo, won });
+    if (won) myWins++; else myLosses++;
+    document.getElementById('wlRecord').textContent = `W: ${myWins} / L: ${myLosses}`;
+  }
+
+  const oppName = currentMatch.opponent;
+  const oppElo  = currentMatch.opponentElo;
+  const wasBot  = isBot;
+  currentMatch  = null;
+  inQueue       = false;
+
+  showMatchResult(won, eloChange, newElo, disconnected, wasBot, oppName, oppElo);
+}
+
+function showMatchResult(won, eloChange, newElo, disconnected, wasBot, oppName, oppElo) {
+  showScreen('resultsScreen');
+
+  document.getElementById('resultTitle').textContent = won ? '🏆 VICTORY!' : '💀 DEFEAT';
+  document.getElementById('resultTitle').style.color  = won ? '#4ade80' : '#ef4444';
+
+  const changeEl = document.getElementById('eloChange');
+  if (wasBot) {
+    changeEl.className = '';
+    changeEl.style.color = '#888';
+    changeEl.textContent = 'Practice match — no ELO change';
+  } else {
+    changeEl.className = eloChange >= 0 ? 'elo-gain' : 'elo-loss';
+    changeEl.textContent = (eloChange >= 0 ? '+' : '') + eloChange + ' ELO';
+  }
+
+  document.getElementById('resultStats').textContent = wasBot
+    ? `Your ELO: ${myElo}`
+    : `Previous: ${myElo} → New: ${newElo}` + (disconnected ? ' (Opponent disconnected)' : '');
+
+  if (!wasBot) myElo = newElo;
+  document.getElementById('eloValue').textContent = myElo;
+}
+
+function returnToLobby() {
+  stopPositionUpdates();
+  document.querySelectorAll('.player, .dash-afterimage, .sword-swing, .damage-number').forEach(el => el.remove());
+  players.clear();
+  keys = {};
+  currentMatch = null;
+  meterCharge = 0;
+  canAttack = true;
+  isCharging = false;
+  if (chargeInterval) { clearInterval(chargeInterval); chargeInterval = null; }
+  inQueue = false;
+  document.getElementById('findMatchBtn').textContent = 'FIND MATCH';
+  document.getElementById('queueMsg').textContent = '';
+  showScreen('lobbyScreen');
+  send({ type: 'get_players' });
+}
+
+// ════════════════════════════════════════════════════════════════
+//  SCREEN UTIL
+// ════════════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    await connectWS();
+  } catch (e) {
+    alert('Failed to connect to game server. Please refresh.');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
