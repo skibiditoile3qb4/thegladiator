@@ -948,8 +948,6 @@ function onAttack() {
   if (!canAttack || !currentMatch) return;
   // Can't attack while shielding
   if (isShielding || shieldRaising) return;
-  myLastAttackTime = Date.now();
-  myLastSwingPower = damage; // record swing power for clash
 
   const me  = players.get(clientId);
   const opp = players.get(currentMatch.opponentId);
@@ -964,6 +962,8 @@ function onAttack() {
     else                        { damage = Math.floor(meterCharge / 100 * 25); hitType = 'normal'; }
   }
 
+  myLastAttackTime = Date.now();
+  myLastSwingPower = damage; // record swing power for clash — must be after damage is calculated
   showSwordSwing(me.element);
 
   if (currentMatch.isBot) {
