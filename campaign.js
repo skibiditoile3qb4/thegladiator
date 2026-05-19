@@ -469,6 +469,14 @@ const CampaignMode = (() => {
     bot.dashReady = false;
     setTimeout(function() { if (bot) bot.dashReady = true; }, DASH_COOLDOWN_MS);
   }
+  function updateBotCharge(bot) {
+  if (!bot.canAttack) { bot.lastCharge = Date.now(); return; }
+  var now = Date.now();
+  if (!bot.lastCharge) bot.lastCharge = now;
+  var dt = now - bot.lastCharge;
+  bot.charge = Math.min(100, (bot.charge || 0) + (dt / ATTACK_CHARGE_MS) * 100);
+  bot.lastCharge = now;
+}
 
   function cBotAttack(bot, player) {
     if (!bot.canAttack || bot.isShielding) return;
