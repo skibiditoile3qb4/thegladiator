@@ -364,6 +364,7 @@
     ::-webkit-scrollbar-track { background: #111; }
     ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
   </style>
+  <script src="campaign.js"></script>
 </head>
 <body>
 
@@ -392,24 +393,10 @@
       <div class="elo-sub" id="wlRecord">W: 0 / L: 0</div>
     </div>
     <div class="queue-panel">
-      <div class="match-type-selector">
-        <button class="match-type-btn active" onclick="selectMatchType('pvp', this)">🎮 PvP</button>
-        <button class="match-type-btn" onclick="selectMatchType('bot', this)">🤖 vs Bot</button>
-      </div>
-      <div id="botDiffWrap" style="display:none; width:100%">
-        <div style="margin-bottom:8px; color:#888; font-size:13px; text-align:center">Select Difficulty</div>
-        <div class="difficulty-grid">
-          <div class="difficulty-btn selected" onclick="selectDifficulty('easy', this)">
-            <div class="diff-name">😊 Easy</div><div class="diff-desc">ELO ~700</div>
-          </div>
-          <div class="difficulty-btn" onclick="selectDifficulty('medium', this)">
-            <div class="diff-name">😐 Medium</div><div class="diff-desc">ELO ~1400</div>
-          </div>
-          <div class="difficulty-btn" onclick="selectDifficulty('hard', this)">
-            <div class="diff-name">😤 Hard</div><div class="diff-desc">ELO ~3000</div>
-          </div>
-        </div>
-      </div>
+<div style="display:flex; gap:12px; width:100%">
+  <button class="match-type-btn active" style="flex:1" onclick="selectMatchType('pvp', this)">🎮 PvP</button>
+  <button class="match-type-btn" style="flex:1" onclick="openCampaign()">⚔️ Campaign</button>
+</div>
       <button id="findMatchBtn" onclick="toggleQueue()">FIND MATCH</button>
       <div id="queueMsg"></div>
       <div id="queueCountWrap">Players in queue: <span id="queueCount">0</span></div>
@@ -719,14 +706,6 @@ function acceptMatch(oppId, matchData) {
   document.getElementById('findMatchBtn').textContent = 'FIND MATCH';
   document.getElementById('queueMsg').textContent = '';
   currentMatch = { opponent: matchData.myUsername || 'Opponent', opponentId: oppId, opponentElo: matchData.myElo || 1000, isBot: false };
-  showScreen('battleScreen'); initBattle();
-}
-function startBotMatch() {
-  const botEloMap = { easy: 700, medium: 1400, hard: 3000 };
-  currentMatch = {
-    opponent: selectedDiff.toUpperCase() + ' Bot', opponentId: 'bot_' + Date.now(),
-    opponentElo: botEloMap[selectedDiff], isBot: true, botDiff: selectedDiff
-  };
   showScreen('battleScreen'); initBattle();
 }
 
@@ -1177,198 +1156,14 @@ function stopPositionUpdates() {
   if (posUpdateInterval) { clearInterval(posUpdateInterval); posUpdateInterval = null; }
 }
 
-// ════════════════════════════════════════════════════════════════
-//  BOT AI
-// ════════════════════════════════════════════════════════════════
-function updateBotCharge(bot) {
-  if (!bot.canAttack) { bot.lastCharge = Date.now(); return; }
-  const now = Date.now();
-  if (!bot.lastCharge) bot.lastCharge = now;
-  const dt = now - bot.lastCharge;
-  bot.charge = Math.min(100, (bot.charge || 0) + (dt / ATTACK_CHARGE_MS) * 100);
-  bot.lastCharge = now;
-}
-
-function botMove(bot, targetX, targetY, speed = PLAYER_SPEED) {
-  const dx = targetX - bot.x, dy = targetY - bot.y;
-  const mag = Math.sqrt(dx * dx + dy * dy);
-  if (mag < 2) return;
-  const maxX = window.innerWidth / 2 - 60, maxY = window.innerHeight / 2 - 100;
-  const nx = bot.x + (dx / mag) * speed, ny = bot.y + (dy / mag) * speed;
-  if (Math.abs(nx) < maxX) bot.x = nx;
-  if (Math.abs(ny) < maxY) bot.y = ny;
-  setPlayerPos(bot.element, bot.x, bot.y);
-}
-
-function botRaiseShield(bot) {
-  if (bot.isShielding || bot.shieldRaising) return;
-  bot.shieldRaising = true;
-  setTimeout(() => {
-    if (!bot) return;
-    bot.shieldRaising = false;
-    bot.isShielding = true;
-    bot.element.classList.add('shielding');
-  }, SHIELD_RAISE_MS);
-}
-
-function botLowerShield(bot) {
-  bot.shieldRaising = false;
-  bot.isShielding = false;
-  bot.element.classList.remove('shielding');
-}
-
-function botAttack(bot, player) {
-  if (!bot.canAttack || bot.isShielding) return;
-  const now = Date.now();
-
-  // Bot parry check: bot was recently hit and is now counterattacking
-  const botInParryWindow = (now - bot.lastHitTime) < PARRY_WINDOW_MS && bot.canParry;
-  const damage = bot.charge >= 90 ? 25 : bot.charge < 10 ? 1 : Math.floor(bot.charge / 100 * 25);
-  const hitType = bot.charge >= 90 ? 'critical' : bot.charge < 10 ? 'weak' : 'normal';
-
-  showSwordSwing(bot.element);
-
-  // Check if player parries: player was recently hit AND is currently attacking (canAttack just became false)
-  // We approximate: if myLastHitTime is within parry window and player is NOT shielding
-  const playerInParryWindow = (now - myLastHitTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising;
-
-const playerInClashWindow = (Date.now() - myLastAttackTime) < PARRY_WINDOW_MS && !isShielding && !shieldRaising && myLastSwingPower > 0;
-
-  if (playerInClashWindow) {
-    const diff = myLastSwingPower - damage;
-    myLastSwingPower = 0; // consume the swing
-    showParryEffect(player.element);
-    if (diff >= 0) {
-      // Player wins — bot takes the difference, player takes nothing
-      const clashDmg = Math.max(1, diff);
-      oppHealth = Math.max(0, oppHealth - clashDmg);
-      bot.health = oppHealth;
-      updateHealth(bot.element, oppHealth);
-      showDamageNum(clashDmg, 'parry', bot.element);
-    } else {
-      // Bot wins — player takes the difference only
-      const clashDmg = Math.max(1, Math.abs(diff));
-      player.health = Math.max(0, player.health - clashDmg);
-      myHealth = player.health;
-      updateHealth(player.element, player.health);
-      showDamageNum(clashDmg, hitType, player.element);
-      myLastHitTime = Date.now();
-    }
-    bot.canAttack = false; bot.charge = 0;
-    setTimeout(() => { if (bot) bot.canAttack = true; }, 200);
-    if (oppHealth <= 0 && currentMatch) { endMatch(true, false); return; }
-    if (myHealth <= 0 && currentMatch) { endMatch(false, false); return; }
-    return;
-  }
-
-  // Apply player's shield reduction if shielding
-  let finalDamage = damage;
-  if (isShielding) {
-    finalDamage = Math.max(1, Math.floor(damage * 0.5));
-    showDamageNum(finalDamage, 'blocked', player.element);
+function openCampaign() {
+  if (typeof CampaignMode !== 'undefined') {
+    CampaignMode.open();
   } else {
-    showDamageNum(finalDamage, hitType, player.element);
-    myLastHitTime = now; // player got hit — parry window opens
-  }
-
-  player.health = Math.max(0, player.health - finalDamage);
-  myHealth = player.health;
-  updateHealth(player.element, player.health);
-  bot.charge = 0; bot.canAttack = false; bot.justGotHit = false;
-  setTimeout(() => { if (bot) bot.canAttack = true; }, 200);
-  if (player.health <= 0 && currentMatch) endMatch(false, false);
-}
-
-function botDash(bot, tx, ty) {
-  if (!bot.dashReady) return;
-  const maxX = window.innerWidth / 2 - 60, maxY = window.innerHeight / 2 - 100;
-  for (let i = 0; i < 4; i++) setTimeout(() => makeAfterimage(bot.x, bot.y, '#ef4444'), i * 20);
-  bot.x = Math.max(-maxX, Math.min(maxX, tx));
-  bot.y = Math.max(-maxY, Math.min(maxY, ty));
-  setPlayerPos(bot.element, bot.x, bot.y);
-  bot.dashReady = false;
-  setTimeout(() => { if (bot) bot.dashReady = true; }, DASH_COOLDOWN_MS);
-}
-
-function easyBot(bot, player) {
-  const d = dist2D(bot, player);
-  const dx = player.x - bot.x, dy = player.y - bot.y;
-  const mag = Math.sqrt(dx * dx + dy * dy);
-
-  // Easy bot: raise shield when just got hit (30% chance), lower after 1.5s
-  if (bot.justGotHit && !bot.isShielding && Math.random() > 0.7) {
-    botRaiseShield(bot);
-    bot.justGotHit = false;
-    setTimeout(() => { if (bot) botLowerShield(bot); }, 1500);
-  }
-
-  if (d > ATTACK_RANGE + 20) botMove(bot, player.x, player.y);
-  if (d <= ATTACK_RANGE && bot.charge >= 10 && bot.canAttack) botAttack(bot, player);
-  if (bot.justGotHit && bot.dashReady && Math.random() > 0.15)
-    botDash(bot, bot.x - (dx / mag) * DASH_DISTANCE, bot.y - (dy / mag) * DASH_DISTANCE);
-}
-
-function mediumBot(bot, player) {
-  const d = dist2D(bot, player);
-  const dx = player.x - bot.x, dy = player.y - bot.y;
-  const mag = Math.sqrt(dx * dx + dy * dy);
-  const targetDist = ATTACK_RANGE - 5;
-
-  // Medium bot: shield when player has high charge (50% chance)
-  if (meterCharge >= 75 && d < 90 && !bot.isShielding && Math.random() > 0.5) {
-    botRaiseShield(bot);
-    setTimeout(() => { if (bot) botLowerShield(bot); }, 600 + Math.random() * 400);
-  }
-
-  if (d > targetDist + 10) botMove(bot, player.x, player.y);
-  else if (d < targetDist - 10) botMove(bot, bot.x - dx / mag * PLAYER_SPEED, bot.y - dy / mag * PLAYER_SPEED);
-
-  if (d <= ATTACK_RANGE && bot.charge >= 80 && bot.canAttack)
-    setTimeout(() => { if (bot && players.get(currentMatch?.opponentId)) botAttack(bot, player); }, 200);
-
-  if (meterCharge >= 88 && d < 85 && bot.dashReady && Math.random() > 0.3) {
-    const px = -dy / mag, py = dx / mag, dir = Math.random() > 0.5 ? 1 : -1;
-    botDash(bot, bot.x + px * DASH_DISTANCE * dir, bot.y + py * DASH_DISTANCE * dir);
+    console.error('campaign.js not loaded');
   }
 }
 
-function hardBot(bot, player) {
-  const d = dist2D(bot, player);
-  const dx = player.x - bot.x, dy = player.y - bot.y;
-  const mag = Math.sqrt(dx * dx + dy * dy);
-
-  // Hard bot: aggressively shield when player about to crit, then counter
-  if (meterCharge >= 80 && d < 95 && !bot.isShielding && Math.random() > 0.2) {
-    botRaiseShield(bot);
-    // After blocking, immediately counter-attack
-    setTimeout(() => {
-      if (!bot) return;
-      botLowerShield(bot);
-      if (dist2D(bot, player) <= ATTACK_RANGE && bot.canAttack) botAttack(bot, player);
-    }, SHIELD_RAISE_MS + 100 + Math.random() * 150);
-  }
-
-  // Dodge when player is about to crit
-  if (meterCharge >= 88 && d < 100 && bot.dashReady && Math.random() > 0.15) {
-    const px = -dy / mag, py = dx / mag, dir = Math.random() > 0.5 ? 1 : -1;
-    botDash(bot, bot.x + px * DASH_DISTANCE * dir, bot.y + py * DASH_DISTANCE * dir);
-    return;
-  }
-
-  const target = meterCharge >= 85 ? 95 : 68;
-  if (d > target + 5)      botMove(bot, player.x, player.y);
-  else if (d < target - 5) botMove(bot, bot.x - dx / mag * PLAYER_SPEED, bot.y - dy / mag * PLAYER_SPEED);
-  else {
-    const px = -dy / mag, py = dx / mag;
-    const dir = Math.sin(Date.now() / 200) > 0 ? 1 : -1;
-    botMove(bot, bot.x + px * dir, bot.y + py * dir);
-  }
-
-  if (d <= ATTACK_RANGE && bot.charge >= 88 && bot.canAttack) botAttack(bot, player);
-
-  if (meterCharge < 65 && d > 120 && bot.charge >= 85 && bot.dashReady && Math.random() > 0.35)
-    botDash(bot, bot.x + dx / mag * DASH_DISTANCE, bot.y + dy / mag * DASH_DISTANCE);
-}
 
 // ════════════════════════════════════════════════════════════════
 //  UI HELPERS
