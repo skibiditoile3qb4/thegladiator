@@ -693,6 +693,17 @@ function handleIncomingAction(data) {
     handleOpponentDash(data.actionData);
   } else if (action === 'shield' && currentMatch && data.playerId === currentMatch.opponentId) {
     handleOpponentShield(data.actionData);
+  } else if (action === 'health_sync' && currentMatch && data.playerId === currentMatch.opponentId) {
+    oppHealth = data.actionData.health;
+    const opp = players.get(currentMatch.opponentId);
+    if (opp) updateHealth(opp.element, oppHealth);
+    if (oppHealth <= 0) endMatch(true, false);
+  } else if (action === 'parry_damage' && currentMatch && data.playerId === currentMatch.opponentId) {
+    myHealth = Math.max(0, myHealth - data.actionData.damage);
+    const me = players.get(clientId);
+    if (me) { updateHealth(me.element, myHealth); showParryEffect(me.element); }
+    sendAction('health_sync', { health: myHealth });
+    if (myHealth <= 0) endMatch(false, false);
   }
 }
 function startMatchAsInitiator(oppId, oppData) {
@@ -1006,22 +1017,7 @@ function onAttack() {
     // PvP: check parry on opponent side via server relay
     // We send attack; opponent's client checks if they're in parry window
     sendAction('attack', { damage, hitType, attackerPos: { x: me.x, y: me.y } });
-    if (damage > 0) {
-      // Optimistic: apply to local opp display (server is authoritative via relay)
-      const opp2 = players.get(currentMatch.opponentId);
-      if (opp2 && !opp2.isShielding) {
-        oppHealth = Math.max(0, oppHealth - damage);
-        updateHealth(opp2.element, oppHealth);
-        showDamageNum(damage, hitType, opp2.element);
-        if (oppHealth <= 0) endMatch(true, false);
-      } else if (opp2 && opp2.isShielding) {
-        const blocked = Math.max(1, Math.floor(damage * 0.5));
-        oppHealth = Math.max(0, oppHealth - blocked);
-        updateHealth(opp2.element, oppHealth);
-        showDamageNum(blocked, 'blocked', opp2.element);
-        if (oppHealth <= 0) endMatch(true, false);
-      }
-    }
+   
   }
 
   meterCharge = 0;
@@ -1046,7 +1042,8 @@ function handleOpponentAttack(data) {
       if (opp) { updateHealth(opp.element, oppHealth); showDamageNum(clashDmg, 'parry', opp.element); }
       showParryEffect(me.element);
       sendAction('parry_damage', { damage: clashDmg });
-      if (oppHealth <= 0) endMatch(true, false);
+    sendAction('health_sync', { health: myHealth });
+    if (oppHealth <= 0) endMatch(true, false);
     } else {
       // Opponent wins clash — player takes the difference only
       const clashDmg = Math.max(1, Math.abs(diff));
@@ -1071,6 +1068,7 @@ function handleOpponentAttack(data) {
   }
   myHealth = Math.max(0, myHealth - finalDamage);
   updateHealth(me.element, myHealth);
+  sendAction('health_sync', { health: myHealth });
   if (myHealth <= 0) endMatch(false, false);
 }
 // ════════════════════════════════════════════════════════════════
