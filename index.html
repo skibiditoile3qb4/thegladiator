@@ -850,14 +850,7 @@ function gameLoop() {
     setPlayerPos(me.element, me.x, me.y);
   }
 
-  // Bot AI
-  const opp = players.get(currentMatch.opponentId);
-  if (opp && opp.isBot) {
-    updateBotCharge(opp);
-    if (opp.botDiff === 'easy')   easyBot(opp, me);
-    if (opp.botDiff === 'medium') mediumBot(opp, me);
-    if (opp.botDiff === 'hard')   hardBot(opp, me);
-  }
+ 
 
   requestAnimationFrame(gameLoop);
 }
