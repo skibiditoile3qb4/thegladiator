@@ -850,7 +850,11 @@ function gameLoop() {
     setPlayerPos(me.element, me.x, me.y);
   }
 
- 
+  const opp = players.get(currentMatch.opponentId);
+  if (opp && me && opp.isBot && currentMatch.botDiff === 'boss') {
+  updateBotCharge(opp);
+  bossBot(opp, me);
+}
 
   requestAnimationFrame(gameLoop);
 }
